@@ -1,74 +1,96 @@
-import turtle
 import random
+import curses
 
-# Set up the screen
-screen = turtle.Screen()
-screen.title("Rock Paper Scissors")
-screen.setup(width=600, height=400)
-screen.bgcolor("lightblue")
+class Action(int):
+    Rock = 0
+    Paper = 1
+    Scissors = 2
+    Lizard = 3
+    Spock = 4
 
-# Player choices
-choices = ["Rock", "Paper", "Scissors"]
+    @staticmethod
+    def from_number(number):
+        return [Action.Rock, Action.Paper, Action.Scissors, Action.Lizard, Action.Spock][number]
 
-# Function to draw hand shape
-def draw_hand(choice):
-    turtle.clear()  # Clear the previous drawing
-    turtle.penup()
-    turtle.goto(-150, -50)
-    turtle.pendown()
-    turtle.speed(3)
+    @staticmethod
+    def relationships():
+        return {
+            Action.Scissors: [Action.Lizard, Action.Paper],
+            Action.Paper: [Action.Spock, Action.Rock],
+            Action.Rock: [Action.Lizard, Action.Scissors],
+            Action.Lizard: [Action.Spock, Action.Paper],
+            Action.Spock: [Action.Scissors, Action.Rock]
+        }
 
-    if choice == "Rock":
-        turtle.shape("circle")
-        turtle.shapesize(3)
-    elif choice == "Paper":
-        turtle.shape("square")
-        turtle.shapesize(3, 2)
-    else:
-        turtle.shape("triangle")
-        turtle.shapesize(3)
+def main(stdscr):
+    curses.curs_set(False)
+    sh, sw = stdscr.getmaxyx()
+    win = curses.newwin(sh, sw, 0, 0)
+    win.keypad(True)
+    win.timeout(100)
 
-# Function to draw computer's choice
-def draw_computer_hand(choice):
-    turtle.penup()
-    turtle.goto(150, -50)
-    turtle.pendown()
-    turtle.speed(3)
+    user_action = None
+    computer_action = None
+    round_number = 0
 
-    if choice == "Rock":
-        turtle.shape("circle")
-        turtle.shapesize(3)
-    elif choice == "Paper":
-        turtle.shape("square")
-        turtle.shapesize(3, 2)
-    else:
-        turtle.shape("triangle")
-        turtle.shapesize(3)
+    while True:
+        win.clear()
+        win.addstr(0, (sw - 37) // 2, "ROCK PAPER SCISSORS LIZARD SPOCK", curses.A_STANDOUT)
+        win.addstr(2, 1, "User:")
+        win.addstr(2, 15, "Computer:")
+        win.addstr(4, 1, f"{' ' * (len(action_names[user_action]) + 1)} {action_names[user_action]}" if user_action else " ")
+        win.addstr(4, 15, f"{' ' * (len(action_names[computer_action]) + 1)} {action_names[computer_action]}" if computer_action else " ")
+        win.addstr(6, 1, "Press any key to continue...")
+        win.refresh()
 
-# Function to show result
-def show_result(player_choice, computer_choice):
-    turtle.penup()
-    turtle.goto(0, 150)
-    turtle.pendown()
-    turtle.color("black")
-    turtle.write(f"Player: {player_choice}   Computer: {computer_choice}", align="center", font=("Arial", 16, "normal"))
+        if not user_action:
+            user_action = get_user_selection(win)
 
-# Function to play the game
-def play_game():
-    player_choice = screen.textinput("Rock, Paper, Scissors", "Enter your choice (Rock, Paper, Scissors): ").capitalize()
-    computer_choice = random.choice(choices)
+        if not computer_action:
+            computer_action = get_computer_selection()
 
-    draw_hand(player_choice)
-    draw_computer_hand(computer_choice)
-    show_result(player_choice, computer_choice)
+        round_number += 1
+        result = determine_winner(user_action, computer_action)
+        if result == 0:
+            win.addstr(8, 1, "It's a tie!")
+        elif result == 1:
+            win.addstr(8, 1, "You win!")
+        elif result == -1:
+            win.addstr(8, 1, "You lose!")
 
-# Main game loop
-while True:
-    play_game()
-    turtle.clear()  # Clear the screen for the next round
+        win.addstr(10, 1, f"Round: {round_number}")
+        win.refresh()
+        win.getkey()
 
-    play_again = screen.textinput("Play Again?", "Do you want to play again? (yes/no): ").lower()
-    if play_again != "yes":
-        break
+        user_action = None
+        computer_action = None
 
-screen.mainloop()
+def get_user_selection(win):
+    action_names = {
+        Action.Rock: "Rock",
+        Action.Paper: "Paper",
+        Action.Scissors: "Scissors",
+        Action.Lizard: "Lizard",
+        Action.Spock: "Spock"
+    }
+
+    choices = [f"{i + 1}. {action_names[Action.from_number(i)]}" for i in range(len(Action))]
+    choices_str = "\n".join(choices)
+    win.addstr(8, 1, choices_str)
+    win.refresh()
+    key = win.getch()
+    while key < ord('1') or key > ord('5'):
+        key = win.getch()
+    return Action.from_number(int(chr(key)) - 1)
+
+def get_computer_selection():
+    return Action(random.randint(0, 4))
+
+def determine_winner(user_action, computer_action):
+    if user_action == computer_action:
+        return 0
+    if computer_action in Action.relationships()[user_action]:
+        return 1
+    return -1
+
+curses.wrapper(main)
